@@ -6,7 +6,7 @@ GUI shell for [anbox](https://anbox.io/) written in perl.
 - List and start installed Android applications
 - Start / stop session manager
 
-## Depends
+## Dependencies
 - [anbox](https://anbox.io/) installed with [snap](https://snapcraft.io/).
 - perl 5
 - libgtk3-perl
@@ -15,10 +15,10 @@ GUI shell for [anbox](https://anbox.io/) written in perl.
 Adjust global variables at beginning of script
 
 ## Run
-'perl ./anbox-status.pl'
+`perl ./anbox-status.pl`
 
 
-## Screenshots
+## Screenshot
 <div style="display:flex;">
 <img alt="Screenshot" src="screen.png" width="40%">
 </div>
