@@ -10,14 +10,12 @@ use Time::HiRes qw ( setitimer ITIMER_REAL time );
 use HTML::Entities;
  
 
-my $APP_NAME="Anbox Status & Control";
-my $APP_ICON="/usr/share/pixmaps/anbox.png";
+$AdbShell::APP_NAME="Anbox Status & Control";
+$AdbShell::CMD_IFCONFIG="/sbin/ifconfig";
+$AdbShell::CMD_SYSTEMCTL="systemctl";
+$AdbShell::CMD_ANBOX="snap run anbox";
+$AdbShell::SERVICE="snap.anbox.container-manager.service";
 
-my $CMD_ANBOX="anbox";
-my $CMD_IFCONFIG="/sbin/ifconfig";
-my $CMD_SYSTEMCTL="systemctl";
-
- 
 
 my @dom_desktops;
 
@@ -25,9 +23,8 @@ my $ui_window = ui_create_toplevel();
 
 sub ui_create_toplevel {
     my $window = Gtk3::Window->new('toplevel');
-    $window->set_title($APP_NAME);
+    $window->set_title($AdbShell::APP_NAME);
     $window->set_border_width(20);
-    $window->set_icon_from_file($APP_ICON);
     $window->signal_connect (delete_event => \&quit_function);
     return $window;
 }
@@ -183,7 +180,7 @@ sub quit_function {
 
 sub session_start {
     exec_launch(
-    "anbox session-manager&",
+    "$AdbShell::CMD_ANBOX session-manager&",
     "Session Manager");
 }
 
@@ -195,7 +192,7 @@ sub session_stop {
 
 sub launch {
     exec_launch(
-    "anbox launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity",
+    "$AdbShell::CMD_ANBOX launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity",
     "Anbox Application Manager");
 }
 
@@ -219,10 +216,11 @@ sub cl_launch_adb {
 
 
 sub cl_show_status {
-    my $check = exec_read($CMD_ANBOX." check-features");
-    my $version = exec_read($CMD_ANBOX." version");
-    my $container = exec_read($CMD_SYSTEMCTL.' status "anbox-container-manager"  | grep "Active:"');
-    my $address = exec_read($CMD_IFCONFIG.' anbox0 | grep "inet "');
+
+    my $check = exec_read($AdbShell::CMD_ANBOX." check-features");
+    my $version = exec_read($AdbShell::CMD_ANBOX." version");
+    my $container = exec_read($AdbShell::CMD_SYSTEMCTL." status ".$AdbShell::SERVICE.' | grep "Active:"');
+    my $address = exec_read($AdbShell::CMD_IFCONFIG.' anbox0 | grep "inet "');
 
 
     my $pids = "";
@@ -351,14 +349,17 @@ sub span_color {
 
 
 sub read_all_desktop_files {
+
     my $home = $ENV{"HOME"} . "/.local/share/applications/anbox";
     my $system = "/usr/share/applications/anbox";
     my $local = "/usr/local/share/applications/anbox";
+    my $snap_home = $ENV{"HOME"} . "/snap/anbox/common/app-data/applications/anbox";
 
     @dom_desktops = ();
     read_desktop_files($home);
     read_desktop_files($system);
     read_desktop_files($local);
+    read_desktop_files($snap_home);
     @dom_desktops = sort { %{$a}{'Name'} cmp %{$b}{'Name'} } @dom_desktops;
 }
 
