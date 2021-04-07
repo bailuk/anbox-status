@@ -10,12 +10,19 @@ use Time::HiRes qw ( setitimer ITIMER_REAL time );
 use HTML::Entities;
  
 
-$AdbShell::APP_NAME="Anbox Status & Control";
-$AdbShell::CMD_IFCONFIG="/sbin/ifconfig";
-$AdbShell::CMD_SYSTEMCTL="systemctl";
-$AdbShell::CMD_ANBOX="snap run anbox";
-$AdbShell::SERVICE="snap.anbox.container-manager.service";
+$AnboxStatus::APP_NAME = 'Anbox Status & Control';
+$AnboxStatus::CMD_IFCONFIG = '/sbin/ifconfig';
+$AnboxStatus::CMD_SYSTEMCTL = 'systemctl';
+$AnboxStatus::CMD_ANBOX = 'snap run anbox';
+$AnboxStatus::SERVICE = 'snap.anbox.container-manager.service';
 
+@AnboxStatus::DESKTOPS = (
+    $ENV{'HOME'} . '/.local/share/applications/anbox',
+    '/usr/share/applications/anbox',
+    '/usr/local/share/applications/anbox',
+    '/snap/anbox/current/desktop/',
+    $ENV{'HOME'} . '/snap/anbox/common/app-data/applications/anbox'
+);
 
 my @dom_desktops;
 
@@ -23,7 +30,7 @@ my $ui_window = ui_create_toplevel();
 
 sub ui_create_toplevel {
     my $window = Gtk3::Window->new('toplevel');
-    $window->set_title($AdbShell::APP_NAME);
+    $window->set_title($AnboxStatus::APP_NAME);
     $window->set_border_width(20);
     $window->signal_connect (delete_event => \&quit_function);
     return $window;
@@ -114,6 +121,17 @@ sub cl_init {
     cl_fill_list($ui_list);
 }
 
+sub cl_get_image {
+    my ( $icon, $size ) = @_;
+    
+    eval {
+        my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_size($icon,$size,$size);
+        return Gtk3::Image->new_from_pixbuf($pixbuf);
+    } or do {
+        return Gtk3::Image->new();
+    }
+}
+
 sub cl_fill_list {
     my ( $list ) = @_;
 
@@ -122,8 +140,8 @@ sub cl_fill_list {
 
         my %desktop = %{$_};
 
-        my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_size($desktop{'Icon'},32,32);
-        my $image = Gtk3::Image->new_from_pixbuf($pixbuf);
+
+        my $image = cl_get_image($desktop{'Icon'},32);
         my $label = Gtk3::Label->new();
         $label->set_xalign(0.0);
         $label->set_text($desktop{'Name'});
@@ -180,7 +198,7 @@ sub quit_function {
 
 sub session_start {
     exec_launch(
-    "$AdbShell::CMD_ANBOX session-manager&",
+    "$AnboxStatus::CMD_ANBOX session-manager&",
     "Session Manager");
 }
 
@@ -192,7 +210,7 @@ sub session_stop {
 
 sub launch {
     exec_launch(
-    "$AdbShell::CMD_ANBOX launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity",
+    "$AnboxStatus::CMD_ANBOX launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity",
     "Anbox Application Manager");
 }
 
@@ -217,10 +235,10 @@ sub cl_launch_adb {
 
 sub cl_show_status {
 
-    my $check = exec_read($AdbShell::CMD_ANBOX." check-features");
-    my $version = exec_read($AdbShell::CMD_ANBOX." version");
-    my $container = exec_read($AdbShell::CMD_SYSTEMCTL." status ".$AdbShell::SERVICE.' | grep "Active:"');
-    my $address = exec_read($AdbShell::CMD_IFCONFIG.' anbox0 | grep "inet "');
+    my $check = exec_read($AnboxStatus::CMD_ANBOX." check-features");
+    my $version = exec_read($AnboxStatus::CMD_ANBOX." version");
+    my $container = exec_read($AnboxStatus::CMD_SYSTEMCTL." status ".$AnboxStatus::SERVICE.' | grep "Active:"');
+    my $address = exec_read($AnboxStatus::CMD_IFCONFIG.' anbox0 | grep "inet "');
 
 
     my $pids = "";
@@ -350,16 +368,13 @@ sub span_color {
 
 sub read_all_desktop_files {
 
-    my $home = $ENV{"HOME"} . "/.local/share/applications/anbox";
-    my $system = "/usr/share/applications/anbox";
-    my $local = "/usr/local/share/applications/anbox";
-    my $snap_home = $ENV{"HOME"} . "/snap/anbox/common/app-data/applications/anbox";
-
     @dom_desktops = ();
-    read_desktop_files($home);
-    read_desktop_files($system);
-    read_desktop_files($local);
-    read_desktop_files($snap_home);
+
+    foreach ( @AnboxStatus::DESKTOPS ) {
+        print("$_\n");
+        read_desktop_files($_);
+    }
+
     @dom_desktops = sort { %{$a}{'Name'} cmp %{$b}{'Name'} } @dom_desktops;
 }
 
