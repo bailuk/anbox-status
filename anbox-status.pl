@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use strict;              # Perl pragma to restrict unsafe constructs
 use warnings;            # Perl pragma to control optional warnings
@@ -10,12 +10,13 @@ use Time::HiRes qw ( setitimer ITIMER_REAL time );
 use HTML::Entities;
  
 
-$AnboxStatus::APP_NAME = 'Anbox Status & Control';
-$AnboxStatus::CMD_IFCONFIG = '/sbin/ifconfig';
+$AnboxStatus::APP_NAME      = 'Anbox Status & Control';
+$AnboxStatus::CMD_IFCONFIG  = '/sbin/ifconfig';
 $AnboxStatus::CMD_SYSTEMCTL = 'systemctl';
-$AnboxStatus::CMD_ANBOX = 'snap run anbox';
-$AnboxStatus::SERVICE = 'snap.anbox.container-manager.service';
+$AnboxStatus::CMD_ANBOX     = 'snap run anbox';
+$AnboxStatus::SERVICE       = 'snap.anbox.container-manager.service';
 
+# possible locations of desktop files for Android apps
 @AnboxStatus::DESKTOPS = (
     $ENV{'HOME'} . '/.local/share/applications/anbox',
     '/usr/share/applications/anbox',
@@ -23,6 +24,44 @@ $AnboxStatus::SERVICE = 'snap.anbox.container-manager.service';
     '/snap/anbox/current/desktop/',
     $ENV{'HOME'} . '/snap/anbox/common/app-data/applications/anbox'
 );
+
+# right side function buttons
+@AnboxStatus::BUTTONS = (
+    {text => 'Anbox session'},
+    {text => 'Start Session Manager', exec => sub { 
+        exec_launch("$AnboxStatus::CMD_ANBOX session-manager&", "Session Manager");
+    }},
+
+    {text => 'Stop Session Manager', exec => sub {
+        exec_launch("killall anbox","killall anbox");
+    }},
+    
+    {text => 'Android'},
+    {text => 'Anbox Application Manager', exec => sub {
+        exec_launch("$AnboxStatus::CMD_ANBOX launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity",
+                    "Anbox Application Manager");
+    }},
+
+    {text => 'Exchange'},
+    {text => 'thunar ftp://', exec => sub {
+        if (length($AnboxStatus::ip) > 6) {
+            exec_launch("thunar ftp://$AnboxStatus::ip:2121/ &");
+        } else {
+            exec_launch_error(getTime(), "thunar ftp://[ip is missing]:2121/ &");
+        }
+    }},
+
+#    {text => 'adb shell', exec => sub {
+#        exec_launch("xfce4-terminal -x adb shell &");
+#    }},
+    
+    {text => 'ADB Shell', exec => sub {
+        exec_launch("../adb-shell/adb-shell.py l&", "ADB Shell");
+    }}
+
+
+);
+
 
 my @dom_desktops;
 
@@ -40,18 +79,25 @@ sub ui_create_toplevel {
 
 my $ui_buttons = ui_create_buttons();
 
+
 sub ui_create_buttons {
     my $result = Gtk3::Box->new("vertical", 5);
+
     $result->set_homogeneous (FALSE);
-    $result->add(ui_create_group_label("Anbox session"));
-    ui_create_button($result, "Start Session Manager", \&session_start);
-    ui_create_button($result, "Stop Session Manager", \&session_stop);
-    $result->add(ui_create_group_label("Android"));
-    ui_create_button($result, "Anbox Application Manager", \&launch);
-    $result->add(ui_create_group_label("Exchange"));
-    ui_create_button($result, "thunar ftp://", \&exchange);
-    ui_create_button($result, "adb shell", \&cl_launch_adb);
+
+    foreach(@AnboxStatus::BUTTONS) {
+        my %h = %{$_};
+        my $text = $h{'text'};
         
+        if (exists $h{'exec'}) {
+            my $exec = $h{'exec'};
+            ui_create_button($result, $text, $exec);
+            
+        } else {
+            $result->add(ui_create_group_label($text));
+        }
+    }
+       
     return $result;
 }
 
@@ -59,6 +105,7 @@ sub ui_create_buttons {
 sub ui_create_button {
     my ( $parent, $text, $onClicked ) = @_;
     my $result = Gtk3::Button->new($text);
+
     $result->signal_connect (clicked => $onClicked);
     $parent->add($result);
     return $result;
@@ -84,9 +131,6 @@ sub ui_scroll {
     $result->add($child);
     return $result;
 }
-
-
-
 
 my $ui_vbox_main = Gtk3::Box->new("vertical", 5);
 
@@ -128,6 +172,7 @@ sub cl_get_image {
         my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_size($icon,$size,$size);
         return Gtk3::Image->new_from_pixbuf($pixbuf);
     } or do {
+        
         return Gtk3::Image->new();
     }
 }
@@ -139,7 +184,6 @@ sub cl_fill_list {
         my $entry = Gtk3::Box->new("horizontal", 2);
 
         my %desktop = %{$_};
-
 
         my $image = cl_get_image($desktop{'Icon'},32);
         my $label = Gtk3::Label->new();
@@ -185,7 +229,6 @@ sub add_label_to {
 $SIG{ALRM} = sub {cl_show_status()};
 setitimer(ITIMER_REAL, 0.1, 5);
 
-session_start();
 
 
 #### DOMAIN
@@ -196,39 +239,8 @@ sub quit_function {
 	return FALSE;
 }
 
-sub session_start {
-    exec_launch(
-    "$AnboxStatus::CMD_ANBOX session-manager&",
-    "Session Manager");
-}
 
-sub session_stop {
-    exec_launch(
-    "killall anbox",
-    "killall anbox");
-}
-
-sub launch {
-    exec_launch(
-    "$AnboxStatus::CMD_ANBOX launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity",
-    "Anbox Application Manager");
-}
-
-my $dom_ip = "";
-
-
-sub exchange {
-    if (length($dom_ip) > 6) {
-        exec_launch("thunar ftp://$dom_ip:2121/ &");
-    } else {
-        exec_launch_error(getTime(), "thunar ftp://[ip is missing]:2121/ &");
-    }
-}
-
-
-sub cl_launch_adb {
-    exec_launch("xfce4-terminal -x adb shell &");
-}
+$AnboxStatus::ip = "";
 
 
 
@@ -251,9 +263,9 @@ sub cl_show_status {
 
 
 
-    $dom_ip = get_ip($address);
+    $AnboxStatus::ip = get_ip($address);
     
-    my $ip = $dom_ip;
+    my $ip = $AnboxStatus::ip;
     
     if ($ip eq '') {
         $ip = 'no ip address found';    
@@ -371,7 +383,6 @@ sub read_all_desktop_files {
     @dom_desktops = ();
 
     foreach ( @AnboxStatus::DESKTOPS ) {
-        print("$_\n");
         read_desktop_files($_);
     }
 
