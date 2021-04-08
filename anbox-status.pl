@@ -11,6 +11,7 @@ use HTML::Entities;
  
 
 $AnboxStatus::APP_NAME      = 'Anbox Status & Control';
+$AnboxStatus::ICON          = '/snap/anbox/current/snap/gui/icon.png';
 $AnboxStatus::CMD_IFCONFIG  = '/sbin/ifconfig';
 $AnboxStatus::CMD_SYSTEMCTL = 'systemctl';
 $AnboxStatus::CMD_ANBOX     = 'snap run anbox';
@@ -71,6 +72,12 @@ sub ui_create_toplevel {
     my $window = Gtk3::Window->new('toplevel');
     $window->set_title($AnboxStatus::APP_NAME);
     $window->set_border_width(20);
+    
+    eval {
+        my $pixbuf = cl_get_pixbuf($AnboxStatus::ICON, 64);
+        $window->set_icon($pixbuf);
+    };
+
     $window->signal_connect (delete_event => \&quit_function);
     return $window;
 }
@@ -165,11 +172,20 @@ sub cl_init {
     cl_fill_list($ui_list);
 }
 
+sub cl_get_pixbuf {
+    my ( $icon, $size ) = @_;
+
+    my $result = Gtk3::Gdk::Pixbuf->new_from_file_at_size($icon,$size,$size);
+    
+    return $result;
+}
+
+
 sub cl_get_image {
     my ( $icon, $size ) = @_;
     
     eval {
-        my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_size($icon,$size,$size);
+        my $pixbuf = cl_get_pixbuf($icon, $size);
         return Gtk3::Image->new_from_pixbuf($pixbuf);
     } or do {
         
